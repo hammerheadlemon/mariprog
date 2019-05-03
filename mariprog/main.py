@@ -123,6 +123,15 @@ def print_site_data_to_terminal(filename):
         print(f"{port.site_name:<60} --- {port.pfsi_category:<10} --- {port.site_category:<10} -- {port.last_inspection_date}")
 
 
+# TODO check this
+def week_port_is_in_programme(port):
+    for p in LIST_OF_PORTS:
+        if p.site_name == port:
+            for inspection in inspections_in_programme:
+                if port == inspection.facility:
+                    print(port, inspection.week_begining)
+
+
 def count_inspections_for_inspector(initials):
     count = 0
     for inspection in inspections_in_programme:
@@ -145,7 +154,6 @@ def main():
     print("PN: ", count_inspections_for_inspector("PN"))
     print("SC: ", count_inspections_for_inspector("SC"))
     print("SP: ", count_inspections_for_inspector("SP"))
-
 
 if __name__ == '__main__':
     main()
