@@ -55,7 +55,9 @@ class Inspection:
 class PortFromCSVRow:
     def __init__(self, row):
         self.site_name = row['SiteName'].strip()
+        self.county = row['County'].strip()
         self.last_inspection_date = self.parse_date_string(row['DateOfLastInspection'])
+        self.frequency_target = row['FrequencyTarget'].strip() if row['FrequencyTarget'] else "XXXXX"
         self.pfsi_category = row['SubCategoryDesc'].strip()
         self.site_category = row['SiteCategoryDesc'].strip()
 
@@ -87,7 +89,7 @@ def parse_programme(csv_file):
     """
     current_week = ""
 
-    with open(csv_file, "r", encoding="utf-8") as csvfile:
+    with open(csv_file, "r", encoding="ISO-8859-1") as csvfile:
         csv_reader = csv.reader(csvfile)
         key = _get_header_key_from_csv(csvfile)
         for row in csv_reader:
@@ -108,19 +110,29 @@ def parse_csv(csv_file):
     """
     Parses the csv file.
     """
-    with open(csv_file, "r", encoding="utf-8") as csvfile:
-        csv_reader = csv.DictReader(csvfile)
-        for row in csv_reader:
-            port = PortFromCSVRow(row)
-            if row['SiteTypeDesc'] == "Port":
-                LIST_OF_PORTS.append(port)
+    try:
+        with open(csv_file, "r", encoding="utf-8") as csvfile:
+            csv_reader = csv.DictReader(csvfile)
+            for row in csv_reader:
+                port = PortFromCSVRow(row)
+                if row['SiteTypeDesc'] == "Port":
+                    LIST_OF_PORTS.append(port)
+    except UnicodeDecodeError:
+        # the file was made on Windoze
+        with open(csv_file, "r", encoding="ISO-8859-1") as csvfile:
+            csv_reader = csv.DictReader(csvfile)
+            for row in csv_reader:
+                port = PortFromCSVRow(row)
+                if row['SiteTypeDesc'] == "Port":
+                    LIST_OF_PORTS.append(port)
+
 
 
 def print_site_data_to_terminal(filename):
     parse_csv(filename)
     sorted_list = sorted(LIST_OF_PORTS, key=lambda port: port.last_inspection_date)
     for port in sorted_list:
-        print(f"{port.site_name:<60} --- {port.pfsi_category:<10} --- {port.site_category:<10} -- {port.last_inspection_date}")
+        print(f"{port.site_name:<60} --- {port.county:<20} {port.pfsi_category:<10} {port.site_category:<10} {port.frequency_target:<5} {port.last_inspection_date}")
 
 
 # TODO check this
@@ -154,6 +166,7 @@ def main():
     print("PN: ", count_inspections_for_inspector("PN"))
     print("SC: ", count_inspections_for_inspector("SC"))
     print("SP: ", count_inspections_for_inspector("SP"))
+
 
 if __name__ == '__main__':
     main()
