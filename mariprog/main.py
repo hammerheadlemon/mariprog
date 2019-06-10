@@ -158,13 +158,13 @@ def calculate_port_within_allowed_period(port):
     last_insp = port.last_inspection_date
     calc = last_insp + relativedelta(months=+ft)
     in_prog = in_current_programme(port)
-    print(f"{port.site_name:<60} -- Next inspection due: {calc} - {in_prog}")
+    print(f"{port.site_name:<60} -- Next inspection due: {calc} - {in_prog}.")
 
 
 def in_current_programme(port):
     for p in inspections_in_programme:
         if p.facility == port.site_name:
-            return True
+            return (True, p.week_begining)
         else:
             continue
     return False
