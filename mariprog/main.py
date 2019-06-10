@@ -4,6 +4,7 @@ Parse the site dump spreadsheet from Mallard and get nice stuff from it.
 import csv
 import re
 from datetime import date
+from dateutil.relativedelta import *
 
 inspections_in_programme = []
 LIST_OF_PORTS = []
@@ -152,12 +153,35 @@ def count_inspections_for_inspector(initials):
     return count
 
 
+def calculate_port_within_allowed_period(port):
+    ft = int(port.frequency_target)
+    last_insp = port.last_inspection_date
+    calc = last_insp + relativedelta(months=+ft)
+    in_prog = in_current_programme(port)
+    print(f"{port.site_name:<60} -- Next inspection due: {calc} - {in_prog}")
+
+
+def in_current_programme(port):
+    for p in inspections_in_programme:
+        if p.facility == port.site_name:
+            return True
+        else:
+            continue
+    return False
+
+
+def print_port_inspection_expiry():
+    for port in LIST_OF_PORTS:
+        calculate_port_within_allowed_period(port)
+
+
 def main():
     """
     Main function.
     """
     print_site_data_to_terminal("dump.csv")
     parse_programme("programme.csv")
+    print_port_inspection_expiry()
     print("ML: ", count_inspections_for_inspector("ML"))
     print("WW: ", count_inspections_for_inspector("WW"))
     print("TL: ", count_inspections_for_inspector("TL"))
