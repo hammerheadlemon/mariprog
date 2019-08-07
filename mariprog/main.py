@@ -1,11 +1,19 @@
 """
 Parse the site dump spreadsheet from Mallard and get nice stuff from it.
+
+Requires:
+    - programme.csv from programme
+    - dump.csv from SitesDump
+    - pfsa.csv from PFSA Expiry Dates
+    - psa.csv from PSA Meetings
+    - psa_aid.csv from Port and PSA_Scheduling_Aid
 """
 import csv
 import datetime
 import re
 from dataclasses import dataclass
 from datetime import date
+from typing import List
 
 from dateutil.relativedelta import *
 
@@ -76,12 +84,66 @@ def _get_header_key_from_csv(opened_csv):
 @dataclass
 class PresentableInspection:
     week_begining: str
-    locaton: str
+    location: str
     facility: str
     inspectors: str
     comments: str
     pfsa_expiry: datetime.date
     pfsa_approval: datetime.date
+
+
+@dataclass
+class PSAMeeting:
+    psa: str
+    date: datetime.datetime
+    pso: str
+    comments: str
+    comments_from_meeting: str
+    inspectors: str
+    psp_reviewed: bool
+    psra_reviewed: bool
+    minutes_held: bool
+
+
+def _convert_str_to_bool(bstr):
+    if bstr in ["TRUE", "True", "true", "YES", "yes", "Yes"]:
+        return True
+    elif bstr in ["FALSE", "False", "false", "No", "NO", "no"]:
+        return False
+    else:
+        raise ValueError("Cannot recognise {bstr}".format(bst))
+
+
+def _convert_datetime_str_to_datetime(dstr):
+    "Must be of the form 14-05-2014 11:00"
+    if not dstr:
+        return ""
+    year = int(dstr.split()[0].split("-")[2])
+    month = int(dstr.split()[0].split("-")[1])
+    day = int(dstr.split()[0].split("-")[0])
+    hour = int(dstr.split()[1].split(":")[0])
+    minute = int(dstr.split()[1].split(":")[1])
+    return datetime.datetime(year, month, day, hour, minute)
+
+
+def psa_meetings(csv_file) -> List[PSAMeeting]:
+    psa_meetings_lst = []
+    with open(csv_file, "r", encoding="ISO-8859-1") as csvfile:
+        csv_reader = csv.DictReader(csvfile)
+        for row in csv_reader:
+            psa_meeting = PSAMeeting(
+                row["PSA_Name"],
+                _convert_datetime_str_to_datetime(row["MeetingDate"]),
+                row["PSO"],
+                row["Comments"],
+                row["CommentsFromMeeting"],
+                row["Inspectors"],
+                _convert_str_to_bool(row["PSPReviewed"]),
+                _convert_str_to_bool(row["PSRAReviewed"]),
+                _convert_str_to_bool(row["MinutesHeld"])
+            )
+            psa_meetings_lst.append(psa_meeting)
+    return psa_meetings_lst
 
 
 def parse_programme(csv_file):
@@ -122,14 +184,16 @@ def parse_programme(csv_file):
                 _pfsa_apr
             )
             presentable_inspections.append(pi)
-#           print(
-#               inspection.week_begining,
-#               f"{inspection.location:<10}",
-#               f"{inspection.facility:<50}",
-#               f"{'|'.join(inspection.inspectors):<10}",
-#               f"{inspection.comments:<40}",
-#               f"PFSA_exp {_pfsa_exp}"
-#           )
+        for inspection in presentable_inspections:
+            print(
+                inspection.week_begining,
+                f"{inspection.location:<10}",
+                f"{inspection.facility:<50}",
+                f"{inspection.inspectors:<10}",
+                f"{inspection.comments:<40}",
+                f"{inspection.pfsa_approval}",
+                f"{inspection.pfsa_expiry}"
+            )
 
 
 class PortFromPFSARow:
@@ -151,7 +215,6 @@ class PortFromPFSARow:
 
 def parse_pfsa_csv(csv_file):
     "Parses the csv containing PFSA expiry data."
-    breakpoint()
     list_of_ports = []
     try:
         with open(csv_file, "r", encoding="utf-8") as csvfile:
@@ -268,11 +331,62 @@ def print_port_inspection_expiry():
         calculate_port_within_allowed_period(port)
 
 
+def print_psa_meetings_from_date(date: datetime.date, comments=False):
+    meetings = psa_meetings("psa_meetings.csv")
+#   today = datetime.datetime.today()
+    after_date = sorted([m for m in meetings if m.date > date], key=lambda x: x.date)
+    for m in after_date:
+        if comments:
+            print(m.date, f"{m.psa:<20}", m.comments)
+        else:
+            print(m.date, f"{m.psa:<20}", m.inspectors)
+
+
+@dataclass
+class PSAData:
+    psa: str
+    pso: str
+    psa_approval_date: datetime.datetime
+    date_of_last_inspection: datetime.datetime
+    due_inspection: datetime.datetime
+
+
+def get_psa_assessment_data(csv_file):
+    output = []
+    with open(csv_file, "r", encoding="ISO-8859-1") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row["SiteTypeDesc"] == "PSA":
+                psa = PSAData(
+                    row["SiteName"],
+                    row["PSO"],
+                    _convert_datetime_str_to_datetime(row["PortSecurityAssessmentApprovalDate"]),
+                    _convert_datetime_str_to_datetime(row["DateOfLastInspection"]),
+                    _convert_datetime_str_to_datetime(row["DateInspectionDue"])
+                )
+                output.append(psa)
+    return output
+
+
+
+def print_psa_assessment_data():
+    psa_assessment_data = sorted(get_psa_assessment_data("psa_aid.csv"), key=lambda x: x.due_inspection)
+    for psa in psa_assessment_data:
+        print(
+            f"{psa.psa:<32}",
+            f"{psa.pso:<30}",
+            f"due: {psa.due_inspection}"
+        )
+
+
+
 def main():
     """
     Main function.
     """
-    parse_programme("programme.csv")
+    print_psa_assessment_data()
+#   print_psa_meetings_from_date(datetime.datetime(2019, 1, 1, 0, 0), comments=False)
+#   parse_programme("programme.csv")
 #   print_site_data_to_terminal("dump.csv")
 #   print_port_inspection_expiry()
 #   print("ML: ", count_inspections_for_inspector("ML"))
